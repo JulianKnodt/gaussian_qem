@@ -1,5 +1,5 @@
 use std::array::from_fn;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
 use super::F;
 
@@ -113,5 +113,15 @@ where
     type Output = Self;
     fn mul(self, o: F) -> Self {
         Self::new(from_fn(|i| self.data[i] * o))
+    }
+}
+
+impl<const N: usize> Sub for SymMatrix<N>
+where
+    [(); sum_up_to::<N>()]:,
+{
+    type Output = Self;
+    fn sub(self, o: Self) -> Self {
+        Self::new(from_fn(|i| self.data[i] - o.data[i]))
     }
 }

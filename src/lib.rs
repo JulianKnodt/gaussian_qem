@@ -8,7 +8,7 @@ pub mod quadric;
 pub mod svd;
 pub mod sym;
 
-mod vec;
+pub mod vec;
 use vec::*;
 
 mod manifold;

@@ -132,6 +132,7 @@ impl<T> CollapsibleManifold<T> {
         unsafe { self.data.get_unchecked(self.vertices.find(v)) }
     }
 
+    /*
     /// All edges in this manifold mesh with v0-v1 in sorted order.
     pub fn ord_edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         self.edges.iter().enumerate().flat_map(|(src, dsts)| {
@@ -140,6 +141,7 @@ impl<T> CollapsibleManifold<T> {
                 .map(move |&dst| [src, dst as usize])
         })
     }
+    */
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

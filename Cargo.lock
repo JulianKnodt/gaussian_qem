@@ -65,6 +65,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "ball-tree"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "231fede71e8a7be880522f487c612ad97881ac8fd65c8b1810e3487b54a0c2b5"
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -242,6 +248,20 @@ checksum = "4a3d7db9596fecd151c5f638c0ee5d5bd487b6e0ea232e5dc96d5250f6f94b1d"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+]
+
+[[package]]
+name = "gaussian_qem"
+version = "0.1.0"
+dependencies = [
+ "ball-tree",
+ "clap",
+ "least_sq",
+ "ordered-float",
+ "pars3d",
+ "priority-queue",
+ "smallvec",
+ "union-find",
 ]
 
 [[package]]
@@ -444,11 +464,11 @@ dependencies = [
 [[package]]
 name = "pars3d"
 version = "0.1.0"
-source = "git+https://github.com/JulianKnodt/pars3d.git#172cc1299b5adb4b00b73f1408ac1b01be86bb63"
 dependencies = [
  "gltf",
  "gltf-json",
  "image 0.24.9",
+ "union-find",
  "zune-inflate",
 ]
 
@@ -492,19 +512,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
-]
-
-[[package]]
-name = "quad_dom_qem"
-version = "0.1.0"
-dependencies = [
- "clap",
- "least_sq",
- "ordered-float",
- "pars3d",
- "priority-queue",
- "smallvec",
- "union-find",
 ]
 
 [[package]]
