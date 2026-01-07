@@ -1,5 +1,5 @@
 use super::sym::SymMatrix3;
-use super::{F, add, dot, kmul, sub};
+use super::{F, add, add_assign, dot, kmul, sub};
 
 use core::array::from_fn;
 use core::ops::{Add, AddAssign, Mul, MulAssign};
@@ -38,16 +38,16 @@ pub struct QuadricAccumulator {
 
 impl<const N: usize> AddAssign<Quadric<N>> for QuadricAccumulator {
     fn add_assign(&mut self, q: Quadric<N>) {
-        self.a = self.a + q.a;
-        self.b = add(self.b, q.b);
+        self.a += q.a;
+        add_assign(&mut self.b, q.b);
         self.area += q.area;
 
         for i in 0..N {
-            self.ggt = self.ggt + SymMatrix3::outer(q.g[i]);
-            self.gd = add(self.gd, kmul(q.d[i], q.g[i]));
+            self.ggt += SymMatrix3::outer(q.g[i]);
+            add_assign(&mut self.gd, kmul(q.d[i], q.g[i]));
         }
 
-        self.nv = add(self.nv, q.nv);
+        add_assign(&mut self.nv, q.nv);
         self.dv += q.dv;
     }
 }
@@ -243,6 +243,8 @@ impl<const N: usize> Quadric<N> {
 
     pub fn tet_attribs(points: [[F; 3]; 4], attribs: [[F; N]; 4], weights: AttrWeights<N>) -> Self {
         // let pn: [[F; 4]; 4] = points.map(|[x, y, z]| [x, y, z, 1.]);
+        // let (q, r) = least_sq::mgs_qr(pn);
+
         let pn: [[F; 4]; 4] = from_fn(|i| {
             if i == 3 {
                 return [1.; 4];
@@ -269,8 +271,8 @@ impl<const N: usize> Quadric<N> {
             let [g0, g1, g2, di] = least_sq::qr_solve(q, r, a_s);
             g[i] = [g0, g1, g2];
             d[i] = di;
-            a = a + SymMatrix3::outer(g[i]);
-            b = add(b, kmul(di, g[i]));
+            a += SymMatrix3::outer(g[i]);
+            add_assign(&mut b, kmul(di, g[i]));
             c += di * di;
         }
 

@@ -3,3 +3,4 @@ tmp.obj
 *.swp
 .DS_Store
 *.ply
+data/

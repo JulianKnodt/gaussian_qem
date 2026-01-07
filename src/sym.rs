@@ -1,5 +1,5 @@
 use std::array::from_fn;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, AddAssign, Mul, Sub};
 
 use super::F;
 
@@ -114,6 +114,17 @@ where
     type Output = Self;
     fn add(self, o: Self) -> Self {
         Self::new(from_fn(|i| self.data[i] + o.data[i]))
+    }
+}
+
+impl<const N: usize> AddAssign for SymMatrix<N>
+where
+    [(); sum_up_to::<N>()]:,
+{
+    fn add_assign(&mut self, o: Self) {
+        for (i, dst) in self.data.iter_mut().enumerate() {
+            *dst += o.data[i];
+        }
     }
 }
 

@@ -9,7 +9,6 @@ pub struct CollapsibleManifold<T> {
 
     pub edges: Vec<Vec<u32>>,
 
-
     pub data: Vec<T>,
 }
 
@@ -137,10 +136,6 @@ impl<T> CollapsibleManifold<T> {
         self.edges[dst] = tmp;
     }
 
-    pub fn merged_vertices(&self, v: usize) -> impl Iterator<Item = usize> + Clone + '_ {
-        self.inv_map.merged(v)
-    }
-
     pub fn get(&self, v: usize) -> &T {
         unsafe { self.data.get_unchecked(self.vertices.find(v)) }
     }
@@ -153,6 +148,4 @@ impl<T> CollapsibleManifold<T> {
                 .map(move |&dst| [src, dst as usize])
         })
     }
-    /*
-     */
 }

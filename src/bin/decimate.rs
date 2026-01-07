@@ -15,12 +15,6 @@ pub fn main() -> std::io::Result<()> {
     // just the vertices and faces, fuse together identical positions
     let va = &mut m.vertex_attrs;
 
-    /*
-    for o in va.opacity.iter_mut() {
-        *o = sigmoid(*o);
-    }
-    */
-
     let mut shuffle_order = vec![[0, 1, 2]; m.v.len()];
 
     for (vi, s) in va.scale.iter_mut().enumerate() {
@@ -92,12 +86,6 @@ pub fn main() -> std::io::Result<()> {
         va.rot[vi] = quat_from_standard(new_bases[0], new_bases[1]);
     }
 
-    /*
-    for o in va.opacity.iter_mut() {
-        *o = inv_sigmoid(*o);
-    }
-    */
-
     let p: pars3d::ply::Ply = m.into();
     let out = std::fs::File::create(&args.output)?;
     let out = std::io::BufWriter::new(out);
@@ -106,13 +94,3 @@ pub fn main() -> std::io::Result<()> {
         .expect(&format!("Failed to save to {}", args.output));
     Ok(())
 }
-
-pub fn sigmoid(x: F) -> F {
-    1. / (1. + (-x).exp())
-}
-
-pub fn inv_sigmoid(y: F) -> F {
-    (y / (1. - y)).ln()
-}
-/*
-*/

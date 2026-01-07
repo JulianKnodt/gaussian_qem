@@ -13,6 +13,13 @@ pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
 }
 
 #[inline]
+pub fn add_assign<const N: usize>(a: &mut [F; N], b: [F; N]) {
+    for i in 0..N {
+        a[i] += b[i];
+    }
+}
+
+#[inline]
 pub fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     from_fn(|i| a[i] - b[i])
 }
