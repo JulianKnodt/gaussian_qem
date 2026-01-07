@@ -17,7 +17,7 @@ pub struct AttrWeights<const N: usize = GN> {
 impl<const N: usize> Default for AttrWeights<N> {
     fn default() -> Self {
         AttrWeights {
-            ws: [1. / N as F; N],
+            ws: [2e-3 / N as F; N],
         }
     }
 }
@@ -26,7 +26,7 @@ impl<const N: usize> Default for AttrWeights<N> {
 pub struct QuadricAccumulator {
     a: SymMatrix3,
     b: [F; 3],
-    area: F,
+    pub area: F,
 
     ggt: SymMatrix3,
     gd: [F; 3],
@@ -102,7 +102,7 @@ impl QuadricAccumulator {
             return [0.; 3];
         }
         let inv_a = self.area.recip();
-        assert!(inv_a.is_finite(), "{}", self.area);
+        debug_assert!(inv_a.is_finite(), "{}", self.area);
         let a = self.a - self.ggt * inv_a;
 
         let b = sub(self.b, kmul(inv_a, self.gd));
@@ -216,10 +216,10 @@ pub struct Quadric<const N: usize = GN> {
 }
 
 impl<const N: usize> Quadric<N> {
-    pub fn new_gaussian(v: [F; 3], scale: [F; 3], quat: [F; 4]) -> Self {
-        Self::new_plane(v, quat_rot([1., 0., 0.], quat), scale[0])
-            + Self::new_plane(v, quat_rot([0., 1., 0.], quat), scale[1])
-            + Self::new_plane(v, quat_rot([0., 0., 1.], quat), scale[2])
+    pub fn new_gaussian(v: [F; 3], [s0, s1, s2]: [F; 3], quat: [F; 4]) -> Self {
+        Self::new_plane(v, quat_rot([1., 0., 0.], quat), 1.) * s0.abs()
+            + Self::new_plane(v, quat_rot([0., 1., 0.], quat), 1.) * s1.abs()
+            + Self::new_plane(v, quat_rot([0., 0., 1.], quat), 1.) * s2.abs()
     }
     pub fn new_plane(v: [F; 3], n: [F; 3], area: F) -> Self {
         let a = SymMatrix3::outer(n);
@@ -241,16 +241,52 @@ impl<const N: usize> Quadric<N> {
         }
     }
 
-    pub fn n_gaussian_attribs(
-        point: [F; 3],
-        scale: [F; 3],
-        quat: [F; 4],
-        attribs: [F; N],
-        weights: AttrWeights<N>,
-    ) -> Self {
-        todo!();
+    pub fn tet_attribs(points: [[F; 3]; 4], attribs: [[F; N]; 4], weights: AttrWeights<N>) -> Self {
+        // let pn: [[F; 4]; 4] = points.map(|[x, y, z]| [x, y, z, 1.]);
+        let pn: [[F; 4]; 4] = from_fn(|i| {
+            if i == 3 {
+                return [1.; 4];
+            }
+            from_fn(|j| points[j][i])
+        });
+        let (q, r) = least_sq::mgs_qr_transpose(pn);
+        debug_assert!(q.iter().all(|col| col.iter().all(|v| v.is_finite())));
+        debug_assert!(r.iter().all(|col| col.iter().all(|v| v.is_finite())));
+
+        let mut a = SymMatrix3::zero();
+        let mut b = [0.; 3];
+        let mut c = 0.;
+        let mut g = [[0.; 3]; N];
+        let mut d = [0.; N];
+
+        for i in 0..N {
+            let w = weights.ws[i];
+            if w <= 0. {
+                continue;
+            }
+            let a_s = attribs.map(|a| a[i] * w);
+            debug_assert!(a_s.iter().copied().all(F::is_finite));
+            let [g0, g1, g2, di] = least_sq::qr_solve(q, r, a_s);
+            g[i] = [g0, g1, g2];
+            d[i] = di;
+            a = a + SymMatrix3::outer(g[i]);
+            b = add(b, kmul(di, g[i]));
+            c += di * di;
+        }
+
+        Self {
+            a,
+            b,
+            c,
+            g,
+            d,
+            area: 0.,
+            nv: [0.; 3],
+            dv: 0.,
+        }
     }
 
+    /*
     pub fn n_attribs<const V: usize>(
         [nx, ny, nz]: [F; 3],
         points: [[F; 3]; V],
@@ -308,6 +344,7 @@ impl<const N: usize> Quadric<N> {
             dv: 0.,
         }
     }
+    */
 
     /// Construct a quadric for a set of attributes
     pub fn dyn_attribs(
@@ -322,9 +359,9 @@ impl<const N: usize> Quadric<N> {
         // TODO maybe make these a small vec of size 4?
         let mut q_buf = vec![];
         let mut pn = vec![[0.; 4]; np + 1];
-        for pi in 0..np {
+        for (pi, dst) in pn.iter_mut().enumerate() {
             let [x, y, z] = points(pi);
-            pn[pi] = [x, y, z, 1.];
+            *dst = [x, y, z, 1.];
         }
         pn[np] = [nx, ny, nz, 0.];
         let r = least_sq::dyn_mgs_qr(&mut pn, &mut q_buf);
@@ -434,7 +471,7 @@ impl<const N: usize> Quadric<N> {
     }
 
     pub fn attributes(&self, p: [F; 3], ws: AttrWeights<N>) -> [F; N] {
-        let attrs = from_fn(|i| {
+        from_fn(|i| {
             let w = ws.ws[i];
             if w <= 0. {
                 return 0.;
@@ -449,9 +486,7 @@ impl<const N: usize> Quadric<N> {
             let out = s / denom;
             assert!(out.is_finite(), "{s}/{denom}");
             out
-        });
-
-        attrs
+        })
     }
 }
 

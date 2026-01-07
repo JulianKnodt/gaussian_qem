@@ -24,4 +24,8 @@ pub struct Args {
     /// Approximate number of output tris.
     #[arg(short = 'n', long, group = "target")]
     pub number: Option<usize>,
+
+    /// Do not use delta cost.
+    #[arg(long)]
+    pub no_delta_cost: bool,
 }

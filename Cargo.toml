@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ball-tree = "0.5.1"
+ball-tree = { path = "../../oss/ball-tree", version = "0.5.1" }
 clap = { version = "4.5.37", features = ["derive"] }
-least_sq = { git = "https://github.com/JulianKnodt/qr_lst_sq.git", version = "0.1.0", features = ["f64"] }
+indicatif = "0.18.3"
+#least_sq = { git = "https://github.com/JulianKnodt/qr_lst_sq.git", version = "0.1.0", features = ["f64"] }
+least_sq = { path = "../qr_lst_sq", version = "0.1.0", features = [] }
 ordered-float = "5.0.0"
-pars3d = { path = "../pars3d", version = "0.1.0", features = ["f64"] }
+pars3d = { path = "../pars3d", version = "0.1.0", features = [] }
 priority-queue = "2.3.1"
 smallvec = "1.15.0"
 union-find = { git = "https://github.com/JulianKnodt/union-find.git", version = "0.1.0" }
+
+timed_regions = { path = "../timed_regions", version = "0.1.0" }
