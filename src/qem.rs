@@ -52,7 +52,7 @@ pub fn simplify(
     };
 
     let attr_ws = AttrWeights::<GN>::default();
-    //attr_ws.ws[0..3].fill(1e-2);
+    //attr_ws.ws[0..3].fill(5e-4);
     //attr_ws.ws[3] = 1e-2;
 
     // normalize all vertices to [-1., 1]
@@ -121,9 +121,9 @@ pub fn simplify(
 
     use indicatif::ProgressIterator;
     for (vi, &v) in v.iter().enumerate().progress() {
-        let nbrs = q.nn(&v).filter(|&(_, _, &adj)| adj != vi).take(16);
+        let nbrs = q.nn(&v).filter(|&(_, _, &adj)| adj != vi).take(20);
         for (num, (_, dist, &adj)) in nbrs.enumerate() {
-            if dist > 0.02 && num >= 12 {
+            if dist > 0.04 && num >= 15 {
                 break;
             }
             m.add_edge(vi, adj);
@@ -142,6 +142,7 @@ pub fn simplify(
         super_simplex_strat: SuperSimplexStrategy::AABB,
         do_not_check_flips: true,
     };
+
     for vi in (0..v.len()).progress() {
         nbrs.clear();
         nbr_idxs.clear();
@@ -172,6 +173,7 @@ pub fn simplify(
             assert!(tet_vol > 0., "{tet_vol}");
             let attrs = vis.map(|vi| get_attrs(unsafe { *nbr_idxs.get_unchecked(vi) }));
             let qa = Quadric::tet_attribs(ps, attrs, attr_ws);
+
             unsafe { m.data.get_unchecked_mut(vi) }.0 += qa * s * (tet_vol / total_vol);
         }
     }
@@ -247,10 +249,6 @@ pub fn simplify(
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;
         scale[vi] = es;
-        if es[2] > 10. {
-            scale[vi] = [1e-3; 3];
-            //println!("{es:?} {:?}", q.a);
-        }
     }
 
     // denormalize all output vertices

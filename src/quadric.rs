@@ -245,15 +245,18 @@ impl<const N: usize> Quadric<N> {
         // let pn: [[F; 4]; 4] = points.map(|[x, y, z]| [x, y, z, 1.]);
         // let (q, r) = least_sq::mgs_qr(pn);
 
+        let tv = pars3d::signed_tet_vol(points).abs();
+
         let pn: [[F; 4]; 4] = from_fn(|i| {
             if i == 3 {
                 return [1.; 4];
             }
             from_fn(|j| points[j][i])
         });
-        let (q, r) = least_sq::mgs_qr_transpose(pn);
-        debug_assert!(q.iter().all(|col| col.iter().all(|v| v.is_finite())));
-        debug_assert!(r.iter().all(|col| col.iter().all(|v| v.is_finite())));
+        let (q, r) = least_sq::mgs_qr_again(least_sq::mgs_qr_transpose(pn));
+
+        assert!(q.iter().all(|col| col.iter().all(|v| v.is_finite())));
+        assert!(r.iter().all(|col| col.iter().all(|v| v.is_finite())));
 
         let mut a = SymMatrix3::zero();
         let mut b = [0.; 3];
@@ -267,8 +270,13 @@ impl<const N: usize> Quadric<N> {
                 continue;
             }
             let a_s = attribs.map(|a| a[i] * w);
-            debug_assert!(a_s.iter().copied().all(F::is_finite));
-            let [g0, g1, g2, di] = least_sq::qr_solve(q, r, a_s);
+            let [g0, g1, g2, di] = if tv < 1e-5 {
+                [0., 0., 0., a_s.iter().sum::<F>() / 4.]
+            } else {
+                debug_assert!(a_s.iter().copied().all(F::is_finite));
+                least_sq::qr_solve(q, r, a_s)
+            };
+
             g[i] = [g0, g1, g2];
             d[i] = di;
             a += SymMatrix3::outer(g[i]);
