@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
 use clap::Parser;
 
 use gaussian_qem::{Args, simplify};
@@ -11,9 +14,22 @@ pub fn main() -> std::io::Result<()> {
     let mut scene = pars3d::load(&args.input).expect(&format!("Failed to open {}", args.input));
     assert_eq!(scene.meshes.len(), 1);
     let mut m = scene.meshes.pop().unwrap();
+
     println!("[INFO]: Input has #{} vertices", m.v.len());
     // just the vertices and faces, fuse together identical positions
     let va = &mut m.vertex_attrs;
+
+    let rmed_verts = dedup(&mut m.v, &mut va.opacity, |_dst, src, verts, opacity| {
+        verts.swap_remove(src);
+        opacity.swap_remove(src);
+        m.vert_colors.swap_remove(src);
+        va.scale.swap_remove(src);
+        va.rot.swap_remove(src);
+        va.sph_harmonic_coeff.swap_remove(src);
+    });
+    if rmed_verts != 0 {
+        println!("[INFO]: Deduped {rmed_verts} splats.");
+    }
 
     let mut shuffle_order = vec![[0, 1, 2]; m.v.len()];
 
@@ -36,9 +52,9 @@ pub fn main() -> std::io::Result<()> {
                 shuffle_order[vi].swap(i, j);
             }
         }
-        assert!(0. < s[0]);
-        assert!(s[0] < s[1]);
-        assert!(s[1] < s[2]);
+        assert!(0. < s[0], "{}", s[0]);
+        assert!(s[0] <= s[1], "{} {}", s[0], s[1]);
+        assert!(s[1] <= s[2], "{} {}", s[1], s[2]);
 
         va.rot[vi] = quat_from_standard(bases[0], bases[1]);
     }
@@ -93,4 +109,30 @@ pub fn main() -> std::io::Result<()> {
     p.write(out, pars3d::ply::FormatKind::BinLil)
         .expect(&format!("Failed to save to {}", args.output));
     Ok(())
+}
+
+pub fn dedup(
+    vs: &mut Vec<[F; 3]>,
+    opacity: &mut Vec<F>,
+    mut merge: impl FnMut(usize, usize, &mut Vec<[F; 3]>, &mut Vec<F>),
+) -> usize {
+    let mut all_verts = HashMap::new();
+    let mut rmed = 0;
+    let mut vi = 0;
+    while vi < vs.len() {
+        let v = vs[vi];
+        let key = v.map(F::to_bits);
+        match all_verts.entry(key) {
+            Entry::Vacant(v) => {
+                v.insert(vi);
+                vi += 1;
+            }
+            Entry::Occupied(o) => {
+                merge(*o.get(), vi, vs, opacity);
+                rmed += 1;
+            }
+        }
+    }
+
+    rmed
 }

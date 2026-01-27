@@ -7,10 +7,10 @@ edition = "2024"
 ball-tree = { path = "../../oss/ball-tree", version = "0.5.1" }
 clap = { version = "4.5.37", features = ["derive"] }
 indicatif = "0.18.3"
-#least_sq = { git = "https://github.com/JulianKnodt/qr_lst_sq.git", version = "0.1.0", features = ["f64"] }
-least_sq = { path = "../qr_lst_sq", version = "0.1.0", features = [] }
+least_sq = { git = "https://github.com/JulianKnodt/qr_lst_sq.git", version = "0.1.0", features = ["f64"] }
+#least_sq = { path = "../qr_lst_sq", version = "0.1.0", features = [] }
 ordered-float = "5.0.0"
-pars3d = { path = "../pars3d", version = "0.1.0", features = [] }
+pars3d = { path = "../pars3d", version = "0.1.0", features = ["f64"] }
 priority-queue = "2.3.1"
 smallvec = "1.15.0"
 union-find = { git = "https://github.com/JulianKnodt/union-find.git", version = "0.1.0" }

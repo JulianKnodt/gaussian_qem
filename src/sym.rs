@@ -94,6 +94,7 @@ impl SymMatrix3 {
         let es = vs.map(|v| super::dot(v, self.vec_mul(v)));
         (es, vs)
     }
+
     #[inline]
     pub fn eigen_sorted(&self) -> ([F; 3], [[F; 3]; 3]) {
         let (mut es, mut vs) = self.eigen();
@@ -103,6 +104,8 @@ impl SymMatrix3 {
                 vs.swap(i, j);
             }
         }
+        assert!(es[0] <= es[1]);
+        assert!(es[1] <= es[2]);
         (es, vs)
     }
 }

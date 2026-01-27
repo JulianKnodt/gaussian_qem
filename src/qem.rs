@@ -169,6 +169,7 @@ pub fn simplify(
         for &vis in &tets {
             let ps = vis.map(|vi| unsafe { *nbrs.get_unchecked(vi) });
             let tet_vol = pars3d::signed_tet_vol(ps).abs();
+            assert!(tet_vol > 0., "{tet_vol}");
             let attrs = vis.map(|vi| get_attrs(unsafe { *nbr_idxs.get_unchecked(vi) }));
             let qa = Quadric::tet_attribs(ps, attrs, attr_ws);
             unsafe { m.data.get_unchecked_mut(vi) }.0 += qa * s * (tet_vol / total_vol);
@@ -246,6 +247,10 @@ pub fn simplify(
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;
         scale[vi] = es;
+        if es[2] > 10. {
+            scale[vi] = [1e-3; 3];
+            //println!("{es:?} {:?}", q.a);
+        }
     }
 
     // denormalize all output vertices
