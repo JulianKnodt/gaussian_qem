@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+use std::io::Write;
+use std::time::Instant;
+
 use clap::Parser;
 
 use gaussian_qem::{Args, simplify};
@@ -14,8 +17,9 @@ pub fn main() -> std::io::Result<()> {
     let mut scene = pars3d::load(&args.input).expect(&format!("Failed to open {}", args.input));
     assert_eq!(scene.meshes.len(), 1);
     let mut m = scene.meshes.pop().unwrap();
+    m.n.clear();
 
-    println!("[INFO]: Input has #{} vertices", m.v.len());
+    println!("[INFO]: Input ({}) has #{} vertices", args.input, m.v.len());
     // just the vertices and faces, fuse together identical positions
     let va = &mut m.vertex_attrs;
 
@@ -59,8 +63,8 @@ pub fn main() -> std::io::Result<()> {
         va.rot[vi] = quat_from_standard(bases[0], bases[1]);
     }
 
+    let start = Instant::now();
     // sort all the scale and rotations of the input
-
     let num_verts = simplify(
         &mut m.v,
         &mut m.vert_colors,
@@ -71,13 +75,11 @@ pub fn main() -> std::io::Result<()> {
         &args,
     );
 
+    let elapsed = start.elapsed();
+
     m.v.truncate(num_verts);
     m.vert_colors.truncate(num_verts);
-
-    va.opacity.truncate(num_verts);
-    va.scale.truncate(num_verts);
-    va.rot.truncate(num_verts);
-    va.sph_harmonic_coeff.truncate(num_verts);
+    va.truncate(num_verts);
 
     for (vi, s) in va.scale.iter_mut().enumerate() {
         *s = (*s).map(F::ln);
@@ -102,12 +104,30 @@ pub fn main() -> std::io::Result<()> {
         va.rot[vi] = quat_from_standard(new_bases[0], new_bases[1]);
     }
 
+    println!(
+        "[INFO]: Output ({}) has #{} vertices",
+        args.output,
+        m.v.len()
+    );
+
     let p: pars3d::ply::Ply = m.into();
     let out = std::fs::File::create(&args.output)?;
     let out = std::io::BufWriter::new(out);
-    //p.write(out, pars3d::ply::FormatKind::Ascii)
-    p.write(out, pars3d::ply::FormatKind::BinLil)
-        .expect(&format!("Failed to save to {}", args.output));
+    //p.write(out, pars3d::ply::FormatKind::Ascii)?;
+    p.write(out, pars3d::ply::FormatKind::BinLil)?;
+    //.expect(&format!("Failed to save to {}", args.output));
+
+    if !args.stats.is_empty() {
+        let mut f = std::fs::File::create(args.stats)?;
+        write!(
+            f,
+            r#"{{
+  "elapsed_secs": {}
+}}"#,
+            elapsed.as_secs_f32()
+        )?;
+    }
+
     Ok(())
 }
 

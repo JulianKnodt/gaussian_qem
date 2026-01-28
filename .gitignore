@@ -4,3 +4,4 @@ tmp.obj
 .DS_Store
 *.ply
 data/
+experiment_log.json

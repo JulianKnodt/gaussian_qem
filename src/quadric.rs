@@ -7,6 +7,7 @@ use core::ops::{Add, AddAssign, Mul, MulAssign};
 use pars3d::quat::*;
 
 pub const GN: usize = 1 + 3 + 45;
+//pub const GN: usize = 1 + 3;
 
 /// Weights for each attribute. Joints are kept separate.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -17,7 +18,7 @@ pub struct AttrWeights<const N: usize = GN> {
 impl<const N: usize> Default for AttrWeights<N> {
     fn default() -> Self {
         AttrWeights {
-            ws: [2e-3 / N as F; N],
+            ws: [1e-4 / N as F; N],
         }
     }
 }
@@ -206,7 +207,7 @@ pub struct Quadric<const N: usize = GN> {
     pub b: [F; 3],
     c: F,
 
-    g: [[F; 3]; N],
+    pub g: [[F; 3]; N],
     d: [F; N],
 
     pub area: F,

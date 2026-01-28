@@ -43,7 +43,7 @@ pub fn simplify(
         let mut idx = 4;
         for sh in sphs[i] {
             for s in sh.flat_iter() {
-                *unsafe { data.get_unchecked_mut(idx) } = s;
+                data[idx] = s;
                 idx += 1;
             }
         }
@@ -51,9 +51,12 @@ pub fn simplify(
         data
     };
 
-    let attr_ws = AttrWeights::<GN>::default();
-    //attr_ws.ws[0..3].fill(5e-4);
-    //attr_ws.ws[3] = 1e-2;
+    let mut attr_ws = AttrWeights::<GN>::default();
+    if args.omit_sph {
+        attr_ws.ws[4..].fill(0.);
+    }
+    //attr_ws.ws.fill(0.);
+    let attr_ws = attr_ws;
 
     // normalize all vertices to [-1., 1]
     use std::array::from_fn;
@@ -121,7 +124,10 @@ pub fn simplify(
 
     use indicatif::ProgressIterator;
     for (vi, &v) in v.iter().enumerate().progress() {
-        let nbrs = q.nn(&v).filter(|&(_, _, &adj)| adj != vi).take(20);
+        let nbrs = q
+            .nn(&v)
+            .filter(|&(_, _, &adj)| adj != vi)
+            .take(args.k_nearest);
         for (num, (_, dist, &adj)) in nbrs.enumerate() {
             if dist > 0.04 && num >= 15 {
                 break;
@@ -159,7 +165,9 @@ pub fn simplify(
         bowyer_watson_3d(&nbrs, &mut tets, &mut buf, settings);
 
         tets.retain(|t: &[usize; 4]| t.contains(&0));
-        assert!(!tets.is_empty());
+        if tets.is_empty() {
+            continue;
+        }
 
         let total_vol = tets
             .iter()
@@ -186,6 +194,7 @@ pub fn simplify(
 
     //let mut did_update = vec![];
     let pbar = indicatif::ProgressBar::new(m.vertices.len() as u64);
+    let mut num_hit = 0;
     while let Some(([e0, e1], _qem)) = pq.pop() {
         assert!(e0 < e1);
         if m.is_deleted(e0) || m.is_deleted(e1) {
@@ -207,7 +216,7 @@ pub fn simplify(
 
         // -- Commit
 
-        m.merge(e0, e1, |_, _| {
+        m.merge(e0, e1, |_a, _b| {
             curr_costs[e1] = q01
                 .cost_attrib(pos, q01.attributes(pos, attr_ws), attr_ws)
                 .max(0.);
@@ -221,14 +230,21 @@ pub fn simplify(
             let adj_e @ [l, h] = std::cmp::minmax(e1, adj);
             pq.push(adj_e, update_cost_of_edge!(l, h));
         }
+
+        num_hit += 1;
+        if num_hit == 100_000 {
+            num_hit = 0;
+            pq.retain(|&[e0, e1], _| !m.is_deleted(e0) && !m.is_deleted(e1));
+        }
     }
 
-    for (vi, &(q, p)) in m.vertices() {
+    for (vi, (_, &(q, p))) in m.vertices().enumerate() {
         assert!(p.into_iter().all(F::is_finite));
         v[vi] = p;
         let attrs = q.attributes(p, attr_ws);
 
         let mut set_attrs = |i: usize, attrs: [F; GN]| {
+            assert!(attrs.into_iter().all(F::is_finite));
             vc[i][0] = attrs[0];
             vc[i][1] = attrs[1];
             vc[i][2] = attrs[2];
@@ -244,8 +260,13 @@ pub fn simplify(
         };
 
         set_attrs(vi, attrs);
+        let mut a = q.a;
+        for g in q.g {
+            a = a - crate::sym::SymMatrix3::outer(g);
+        }
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, [v0, v1, _v2]) = q.a.eigen_sorted();
+        let (es, [v0, v1, _v2]) = a.eigen_sorted();
+        assert!(es.into_iter().all(F::is_finite));
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;
         scale[vi] = es;
