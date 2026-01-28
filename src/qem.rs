@@ -232,7 +232,7 @@ pub fn simplify(
         }
 
         num_hit += 1;
-        if num_hit == 100_000 {
+        if num_hit == 400_000 {
             num_hit = 0;
             pq.retain(|&[e0, e1], _| !m.is_deleted(e0) && !m.is_deleted(e1));
         }
@@ -260,12 +260,8 @@ pub fn simplify(
         };
 
         set_attrs(vi, attrs);
-        let mut a = q.a;
-        for g in q.g {
-            a = a - crate::sym::SymMatrix3::outer(g);
-        }
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, [v0, v1, _v2]) = a.eigen_sorted();
+        let (es, [v0, v1, _v2]) = q.a.eigen_sorted();
         assert!(es.into_iter().all(F::is_finite));
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;

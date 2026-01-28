@@ -18,7 +18,7 @@ pub struct AttrWeights<const N: usize = GN> {
 impl<const N: usize> Default for AttrWeights<N> {
     fn default() -> Self {
         AttrWeights {
-            ws: [1e-4 / N as F; N],
+            ws: [2e-3 / N as F; N],
         }
     }
 }

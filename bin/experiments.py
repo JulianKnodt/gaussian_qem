@@ -72,11 +72,11 @@ def runnable_cmds(cmds, stage_kind="run"):
   return cb
 
 data_dir = "data"
-data = [
+data = sorted([
   f
   for f in os.listdir(data_dir)
   if "ply" in f
-]
+])
 
 experiments = {
   "run-all": [ "run-50", "run-25", "run-10", ],
