@@ -75,7 +75,7 @@ data_dir = "data"
 data = sorted([
   f
   for f in os.listdir(data_dir)
-  if "ply" in f
+  if "ply" in f and ("hotel" not in f)
 ])
 
 experiments = {

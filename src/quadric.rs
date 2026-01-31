@@ -271,7 +271,8 @@ impl<const N: usize> Quadric<N> {
                 continue;
             }
             let a_s = attribs.map(|a| a[i] * w);
-            let [g0, g1, g2, di] = if tv < 1e-5 {
+            //let [g0, g1, g2, di] = least_sq::qr_solve(q, r, a_s);
+            let [g0, g1, g2, di] = if tv < 1e-8 {
                 [0., 0., 0., a_s.iter().sum::<F>() / 4.]
             } else {
                 debug_assert!(a_s.iter().copied().all(F::is_finite));

@@ -55,7 +55,6 @@ pub fn simplify(
     if args.omit_sph {
         attr_ws.ws[4..].fill(0.);
     }
-    //attr_ws.ws.fill(0.);
     let attr_ws = attr_ws;
 
     // normalize all vertices to [-1., 1]
@@ -82,6 +81,9 @@ pub fn simplify(
     };
     for v in v.iter_mut() {
         *v = kmul(pos_scale, *v);
+    }
+    for s in scale.iter_mut() {
+        *s = kmul(pos_scale, *s);
     }
 
     let mut m = CollapsibleManifold::new_with(v.len(), |vi| {
@@ -260,18 +262,26 @@ pub fn simplify(
         };
 
         set_attrs(vi, attrs);
+        let mut ggt = crate::sym::SymMatrix3::zero();
+        for g in q.g {
+            ggt = ggt + crate::sym::SymMatrix3::outer(g);
+        }
+        let inv_area = if q.area == 0. { 0. } else { q.area.recip() };
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, [v0, v1, _v2]) = q.a.eigen_sorted();
+        let (es, [v0, v1, _v2]) = (q.a - ggt * inv_area).eigen_sorted();
         assert!(es.into_iter().all(F::is_finite));
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;
-        scale[vi] = es;
+        scale[vi] = es.map(|e| e.clamp(-2., 2.));
     }
 
     // denormalize all output vertices
     let inv_pos_scale = pos_scale.recip();
     for v in v.iter_mut() {
         *v = add(kmul(inv_pos_scale, *v), center);
+    }
+    for s in scale.iter_mut() {
+        *s = kmul(inv_pos_scale, *s);
     }
 
     m.vertices.len()
