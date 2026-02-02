@@ -266,9 +266,9 @@ pub fn simplify(
         for g in q.g {
             ggt = ggt + crate::sym::SymMatrix3::outer(g);
         }
-        let inv_area = if q.area == 0. { 0. } else { q.area.recip() };
+        //let inv_area = if q.area == 0. { 0. } else { q.area.recip() };
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, [v0, v1, _v2]) = (q.a - ggt * inv_area).eigen_sorted();
+        let (es, [v0, v1, _v2]) = q.a.eigen_sorted();
         assert!(es.into_iter().all(F::is_finite));
         let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
         rot[vi] = quat_rot;

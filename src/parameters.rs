@@ -18,7 +18,7 @@ pub struct Args {
     pub output: String,
 
     /// Output stat file.
-    #[arg(long)]
+    #[arg(long, default_value_t = String::new())]
     pub stats: String,
 
     /// Approximate ratio of output/input tris.

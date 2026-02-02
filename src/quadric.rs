@@ -39,7 +39,7 @@ pub struct QuadricAccumulator {
 
 impl<const N: usize> AddAssign<Quadric<N>> for QuadricAccumulator {
     fn add_assign(&mut self, q: Quadric<N>) {
-        self.a += q.a;
+        self.a += q.a + q.a_g;
         add_assign(&mut self.b, q.b);
         self.area += q.area;
 
@@ -207,6 +207,7 @@ pub struct Quadric<const N: usize = GN> {
     pub b: [F; 3],
     c: F,
 
+    pub a_g: SymMatrix3,
     pub g: [[F; 3]; N],
     d: [F; N],
 
@@ -232,6 +233,8 @@ impl<const N: usize> Quadric<N> {
             a,
             b,
             c,
+
+            a_g: SymMatrix3::zero(),
             g: [[0.; 3]; N],
             d: [0.; N],
 
@@ -259,7 +262,7 @@ impl<const N: usize> Quadric<N> {
         assert!(q.iter().all(|col| col.iter().all(|v| v.is_finite())));
         assert!(r.iter().all(|col| col.iter().all(|v| v.is_finite())));
 
-        let mut a = SymMatrix3::zero();
+        let mut a_g = SymMatrix3::zero();
         let mut b = [0.; 3];
         let mut c = 0.;
         let mut g = [[0.; 3]; N];
@@ -281,16 +284,17 @@ impl<const N: usize> Quadric<N> {
 
             g[i] = [g0, g1, g2];
             d[i] = di;
-            a += SymMatrix3::outer(g[i]);
+            a_g += SymMatrix3::outer(g[i]);
             add_assign(&mut b, kmul(di, g[i]));
             c += di * di;
         }
 
         Self {
-            a,
+            a: SymMatrix3::zero(),
             b,
             c,
             g,
+            a_g,
             d,
             area: 0.,
             nv: [0.; 3],
@@ -298,131 +302,13 @@ impl<const N: usize> Quadric<N> {
         }
     }
 
-    /*
-    pub fn n_attribs<const V: usize>(
-        [nx, ny, nz]: [F; 3],
-        points: [[F; 3]; V],
-        attribs: [[F; N]; V],
-
-        weights: AttrWeights<N>,
-    ) -> Self
-    where
-        [(); V + 1]:,
-    {
-        assert!(V > 2);
-        let pn: [[F; 4]; V + 1] = from_fn(|i| {
-            if i == V {
-                return [nx, ny, nz, 0.];
-            }
-            let [x, y, z] = points[i];
-            [x, y, z, 1.]
-        });
-        let (q, r) = least_sq::mgs_qr(pn);
-        assert!(q.iter().all(|col| col.iter().all(|v| v.is_finite())));
-        assert!(r.iter().all(|col| col.iter().all(|v| v.is_finite())));
-
-        let gd: [[F; 4]; N] = from_fn(|i| {
-            let w = weights.ws[i];
-            if w <= 0. {
-                return [0.; 4];
-            }
-            let a_s = from_fn(|pi| {
-                if pi == V {
-                    return 0.;
-                }
-                w * attribs[pi][i]
-            });
-            assert!(a_s.iter().copied().all(F::is_finite));
-            least_sq::qr_solve(q, r, a_s)
-        });
-        let g = gd.map(|[g0, g1, g2, _]| [g0, g1, g2]);
-        let d = gd.map(|[_, _, _, d]| d);
-
-        let a = g
-            .into_iter()
-            .map(SymMatrix3::outer)
-            .fold(SymMatrix3::zero(), Add::add);
-        let b = (0..N).map(|i| kmul(d[i], g[i])).fold([0.; 3], add);
-        let c = d.into_iter().map(|d| d * d).sum::<F>();
-
-        Self {
-            a,
-            b,
-            c,
-            g,
-            d,
-            area: 0.,
-            nv: [0.; 3],
-            dv: 0.,
-        }
-    }
-    */
-
-    /// Construct a quadric for a set of attributes
-    pub fn dyn_attribs(
-        [nx, ny, nz]: [F; 3],
-        np: usize,
-        points: impl Fn(usize) -> [F; 3],
-        attribs: impl Fn(usize) -> [F; N],
-        weights: AttrWeights<N>,
-    ) -> Self {
-        assert!(np > 2);
-        assert!(np > 4, "Internal error");
-        // TODO maybe make these a small vec of size 4?
-        let mut q_buf = vec![];
-        let mut pn = vec![[0.; 4]; np + 1];
-        for (pi, dst) in pn.iter_mut().enumerate() {
-            let [x, y, z] = points(pi);
-            *dst = [x, y, z, 1.];
-        }
-        pn[np] = [nx, ny, nz, 0.];
-        let r = least_sq::dyn_mgs_qr(&mut pn, &mut q_buf);
-        assert!(
-            q_buf
-                .iter()
-                .all(|col| col.iter().copied().all(F::is_finite))
-        );
-        assert!(r.iter().all(|col| col.iter().copied().all(F::is_finite)));
-
-        let gd: [[F; 4]; N] = from_fn(|i| {
-            let w = weights.ws[i];
-            if w <= 0. {
-                return [0.; 4];
-            }
-            least_sq::dyn_qr_solve(
-                &q_buf,
-                r,
-                |pi| if pi == np { 0. } else { w * attribs(pi)[i] },
-            )
-        });
-        let g = gd.map(|[g0, g1, g2, _]| [g0, g1, g2]);
-        let d = gd.map(|[_, _, _, d]| d);
-
-        let a = g
-            .into_iter()
-            .map(SymMatrix3::outer)
-            .fold(SymMatrix3::zero(), Add::add);
-        let b = (0..N).map(|i| kmul(d[i], g[i])).fold([0.; 3], add);
-        let c = d.into_iter().map(|d| d * d).sum::<F>();
-
-        Self {
-            a,
-            b,
-            c,
-            g,
-            d,
-            area: 0.,
-
-            nv: [0.; 3],
-            dv: 0.,
-        }
-    }
     pub fn zero() -> Self {
         Self {
             a: SymMatrix3::zero(),
             b: [0.; 3],
             c: 0.,
             g: [[0.; 3]; N],
+            a_g: SymMatrix3::zero(),
             d: [0.; N],
             area: 0.,
             nv: [0.; 3],
@@ -431,7 +317,7 @@ impl<const N: usize> Quadric<N> {
     }
     /// Compute cost with attributes
     pub fn cost_attrib(&self, v: [F; 3], attrs: [F; N], ws: AttrWeights<N>) -> F {
-        let mut a_v = self.a.vec_mul(v);
+        let mut a_v = (self.a + self.a_g).vec_mul(v);
         for i in 0..N {
             a_v = sub(a_v, kmul(attrs[i] * ws.ws[i], self.g[i]));
         }
@@ -446,40 +332,6 @@ impl<const N: usize> Quadric<N> {
         }
 
         vt_a_v + 2. * bt_v + self.c
-    }
-
-    pub fn invert(&self) -> Option<[F; 3]> {
-        let [a, b, c, d, e, f] = self.a.data;
-        let [r0, r1, r2] = self.b;
-
-        let ad = a * d;
-        let ae = a * e;
-        let af = a * f;
-        let bc = b * c;
-        let be = b * e;
-        let bf = b * f;
-        let df = d * f;
-        let ce = c * e;
-        let cd = c * d;
-
-        let be_cd = be - cd;
-        let bc_ae = bc - ae;
-        let ce_bf = ce - bf;
-
-        let inv_denom = a * df + 2. * b * ce - ae * e - bf * b - cd * c;
-        const EPS: F = 1e-6;
-        if inv_denom < EPS {
-            return None;
-        }
-        assert!(inv_denom >= EPS, "{inv_denom}");
-        let denom = inv_denom.recip();
-        let numer = [
-            r0 * (df - e * e) + r1 * ce_bf + r2 * be_cd,
-            r0 * ce_bf + r1 * (af - c * c) + r2 * bc_ae,
-            r0 * be_cd + r1 * bc_ae + r2 * (ad - b * b),
-        ];
-
-        Some(kmul(denom, numer))
     }
 
     pub fn attributes(&self, p: [F; 3], ws: AttrWeights<N>) -> [F; N] {
@@ -510,6 +362,7 @@ impl<const N: usize> Add for Quadric<N> {
             b: add(self.b, o.b),
             c: self.c + o.c,
 
+            a_g: self.a_g + o.a_g,
             g: from_fn(|i| add(self.g[i], o.g[i])),
             d: add(self.d, o.d),
 
@@ -529,6 +382,7 @@ impl<const N: usize> Mul<F> for Quadric<N> {
             b: kmul(o, self.b),
             c: o * self.c,
 
+            a_g: self.a_g * o,
             g: from_fn(|i| kmul(o, self.g[i])),
             d: kmul(o, self.d),
 
