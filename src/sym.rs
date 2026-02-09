@@ -79,7 +79,7 @@ impl SymMatrix3 {
             self.v_const::<1, 1>(),
             self.v_const::<2, 2>(),
         ];
-        const ZERO_EPS: F = 1e-8;
+        const ZERO_EPS: F = 1e-12;
         // diagonal
         if p1.abs() < ZERO_EPS {
             return (diag, [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]);

@@ -219,9 +219,15 @@ pub struct Quadric<const N: usize = GN> {
 
 impl<const N: usize> Quadric<N> {
     pub fn new_gaussian(v: [F; 3], [s0, s1, s2]: [F; 3], quat: [F; 4]) -> Self {
-        Self::new_plane(v, quat_rot([1., 0., 0.], quat), 1.) * s0.abs()
-            + Self::new_plane(v, quat_rot([0., 1., 0.], quat), 1.) * s1.abs()
-            + Self::new_plane(v, quat_rot([0., 0., 1.], quat), 1.) * s2.abs()
+        assert!(s0 >= 0.);
+        assert!(s1 >= 0.);
+        assert!(s2 >= 0.);
+        let r0 = quat_rot([1., 0., 0.], quat);
+        let r1 = quat_rot([0., 1., 0.], quat);
+        let r2 = quat_rot([0., 0., 1.], quat);
+        Self::new_plane(v, r0, 1.) * s0
+            + Self::new_plane(v, r1, 1.) * s1
+            + Self::new_plane(v, r2, 1.) * s2
     }
     pub fn new_plane(v: [F; 3], n: [F; 3], area: F) -> Self {
         let a = SymMatrix3::outer(n);

@@ -9,8 +9,6 @@ use super::{
     sub,
 };
 
-use std::ops::Neg;
-
 use union_find::UnionFindOp;
 
 use super::parameters::Args;
@@ -110,12 +108,22 @@ pub fn simplify(
 
             let attrs = q01.attributes(p, attr_ws);
 
+            // TODO rethink this cost here?
+            // maybe make it be the size of the smallest eigenvalue
             let total_cost = q01.cost_attrib(p, attrs, attr_ws).max(0.)
                 - if args.no_delta_cost {
                     0.
                 } else {
                     curr_costs[e0] + curr_costs[e1]
                 };
+
+            assert!(total_cost >= 0.);
+
+            /*
+            let ([_v0, v1, v2], _) = q01.a.eigen_sorted();
+            assert!(v1 <= v2);
+            let total_cost = v2;
+            */
 
             unsafe { NotNan::new(-total_cost).unwrap_unchecked() }
         }};
@@ -240,6 +248,8 @@ pub fn simplify(
         }
     }
 
+    const BASES: [[F; 3]; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
+
     for (vi, (_, &(q, p))) in m.vertices().enumerate() {
         assert!(p.into_iter().all(F::is_finite));
         v[vi] = p;
@@ -262,17 +272,70 @@ pub fn simplify(
         };
 
         set_attrs(vi, attrs);
-        let mut ggt = crate::sym::SymMatrix3::zero();
-        for g in q.g {
-            ggt = ggt + crate::sym::SymMatrix3::outer(g);
-        }
-        //let inv_area = if q.area == 0. { 0. } else { q.area.recip() };
+
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, [v0, v1, _v2]) = q.a.eigen_sorted();
+        let (es, vs) = q.a.eigen_sorted();
         assert!(es.into_iter().all(F::is_finite));
-        let quat_rot = pars3d::quat::quat_from_standard(v0.map(Neg::neg), v1.map(Neg::neg));
-        rot[vi] = quat_rot;
-        scale[vi] = es.map(|e| e.clamp(-2., 2.));
+        let es = es.map(|e| e.clamp(-2., 2.));
+        use pars3d::quat;
+        assert!((pars3d::length(vs[0]) - 1.).abs() < 1e-5);
+        assert!((pars3d::length(vs[1]) - 1.).abs() < 1e-5);
+        //let r = quat::quat_from_standard(v0, v1);
+        let og_rot = rot[vi];
+        let bases0 = quat::quat_rot(BASES[0], og_rot);
+        let bases1 = quat::quat_rot(BASES[1], og_rot);
+
+        use pars3d::dot;
+        let mut nearest0 = 0;
+        let mut s0 = F::NEG_INFINITY;
+        let mut nearest1 = 0;
+        let mut s1 = F::NEG_INFINITY;
+        for (i, v) in vs.into_iter().enumerate() {
+            let d0 = dot(v, bases0).abs();
+            if d0 > s0 {
+                nearest0 = i;
+                s0 = d0;
+            }
+            let d1 = dot(v, bases1).abs();
+            if d1 > s1 {
+                nearest1 = i;
+                s1 = d1;
+            }
+        }
+        if nearest0 == nearest1 {
+            if s0 >= s1 {
+                // reassign nearest1
+                nearest1 = vs
+                    .iter()
+                    .enumerate()
+                    .filter(|&(i, _)| i != nearest0)
+                    .map(|(i, v)| (i, dot(*v, bases1)))
+                    .max_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))
+                    .unwrap()
+                    .0;
+            } else {
+                // reassign nearest0
+                nearest0 = vs
+                    .iter()
+                    .enumerate()
+                    .filter(|&(i, _)| i != nearest1)
+                    .map(|(i, v)| (i, dot(*v, bases0)))
+                    .max_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))
+                    .unwrap()
+                    .0;
+            }
+        }
+
+        assert_ne!(nearest0, nearest1, "{es:?} {vs:?}");
+        let other = match (nearest0, nearest1) {
+            (0, 1) | (1, 0) => 2,
+            (0, 2) | (2, 0) => 1,
+            (1, 2) | (2, 1) => 0,
+            _ => unreachable!(),
+        };
+
+        rot[vi] = quat::quat_from_standard(vs[nearest0], vs[nearest1]);
+        scale[vi] = [es[nearest0], es[nearest1], es[other]];
     }
 
     // denormalize all output vertices

@@ -40,4 +40,8 @@ pub struct Args {
     /// Number of neighbors to use for sampling
     #[arg(long, default_value_t = 20)]
     pub k_nearest: usize,
+
+    /// Test the I/O without simplification
+    #[arg(long, hide = true)]
+    pub test_io: bool,
 }
