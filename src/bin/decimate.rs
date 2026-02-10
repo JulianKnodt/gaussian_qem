@@ -33,7 +33,9 @@ pub fn main() -> std::io::Result<()> {
         println!("[INFO]: Deduped {rmed_verts} splats.");
     }
 
-    for s in va.scale.iter_mut() {
+    for (vi, s) in va.scale.iter_mut().enumerate() {
+        // ensure quaternions are normalized
+        va.rot[vi] = pars3d::normalize(va.rot[vi]);
         // switch from log-scale to linear
         *s = (*s).map(F::exp);
     }

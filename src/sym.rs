@@ -96,16 +96,21 @@ impl SymMatrix3 {
     }
 
     #[inline]
-    pub fn eigen_sorted(&self) -> ([F; 3], [[F; 3]; 3]) {
+    pub fn eigen_sorted<const ASC: bool>(&self) -> ([F; 3], [[F; 3]; 3]) {
         let (mut es, mut vs) = self.eigen();
         for [i, j] in [[0, 1], [1, 2], [0, 1]] {
-            if es[i] > es[j] {
+            if (ASC && es[i] > es[j]) || (!ASC && es[i] < es[j]) {
                 es.swap(i, j);
                 vs.swap(i, j);
             }
         }
-        assert!(es[0] <= es[1]);
-        assert!(es[1] <= es[2]);
+        if ASC {
+            assert!(es[0] <= es[1]);
+            assert!(es[1] <= es[2]);
+        } else {
+            assert!(es[0] >= es[1]);
+            assert!(es[1] >= es[2]);
+        }
         (es, vs)
     }
 }

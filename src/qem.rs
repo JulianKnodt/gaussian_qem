@@ -274,7 +274,7 @@ pub fn simplify(
         set_attrs(vi, attrs);
 
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, vs) = q.a.eigen_sorted();
+        let (es, vs) = q.a.eigen_sorted::<true>();
         assert!(es.into_iter().all(F::is_finite));
         let es = es.map(|e| e.clamp(-2., 2.));
         use pars3d::quat;
