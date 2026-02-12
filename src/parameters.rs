@@ -48,4 +48,9 @@ pub struct Args {
     /// Weight to use for preserving orientation of gaussians
     #[arg(long, default_value_t = 1e-4)]
     pub rot_weight: F,
+
+    /// How often to clean up the priority queue.
+    /// Only affects run-time (probably doesn't need to be changed).
+    #[arg(long, default_value_t = 200_000)]
+    pub clean_pq_freq: usize,
 }

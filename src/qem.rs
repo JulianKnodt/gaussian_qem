@@ -244,13 +244,10 @@ pub fn simplify(
         }
 
         num_hit += 1;
-        if num_hit == 400_000 {
-            num_hit = 0;
+        if num_hit % args.clean_pq_freq == 0 {
             pq.retain(|&[e0, e1], _| !m.is_deleted(e0) && !m.is_deleted(e1));
         }
     }
-
-    //const BASES: [[F; 3]; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
 
     for (vi, (_, &(q, p, s, r))) in m.vertices().enumerate() {
         assert!(p.into_iter().all(F::is_finite));
