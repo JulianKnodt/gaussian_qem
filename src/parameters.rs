@@ -44,4 +44,8 @@ pub struct Args {
     /// Test the I/O without simplification
     #[arg(long, hide = true)]
     pub test_io: bool,
+
+    /// Weight to use for preserving orientation of gaussians
+    #[arg(long, default_value_t = 1e-4)]
+    pub rot_weight: F,
 }

@@ -1,5 +1,6 @@
 use ordered_float::NotNan;
 use pars3d::mesh::SphHarmonicCoeff;
+use pars3d::quat;
 use priority_queue::PriorityQueue;
 
 use super::{
@@ -86,7 +87,7 @@ pub fn simplify(
 
     let mut m = CollapsibleManifold::new_with(v.len(), |vi| {
         let q = Quadric::new_gaussian(v[vi], scale[vi], rot[vi]);
-        (q, v[vi])
+        (q, v[vi], scale[vi], rot[vi])
     });
 
     let mut curr_costs = vec![0.; v.len()];
@@ -97,8 +98,8 @@ pub fn simplify(
             let e1 = $e1;
 
             let mut q_acc = QuadricAccumulator::default();
-            let &(q0, _) = m.get(e0);
-            let &(q1, _) = m.get(e1);
+            let &(q0, _, a_s, a_r) = m.get(e0);
+            let &(q1, _, b_s, b_r) = m.get(e1);
             let q01 = q0 + q1;
             q_acc += q0;
             q_acc += q1;
@@ -117,13 +118,12 @@ pub fn simplify(
                     curr_costs[e0] + curr_costs[e1]
                 };
 
-            assert!(total_cost >= 0.);
+            //assert!(total_cost >= 0., "{total_cost:?}");
 
-            /*
-            let ([_v0, v1, v2], _) = q01.a.eigen_sorted();
-            assert!(v1 <= v2);
-            let total_cost = v2;
-            */
+            let (rot_cost, _, _) = best_rot(&q01.a, a_s, a_r, b_s, b_r);
+            assert!(rot_cost > 0.);
+
+            let total_cost = total_cost + args.rot_weight * rot_cost;
 
             unsafe { NotNan::new(-total_cost).unwrap_unchecked() }
         }};
@@ -226,11 +226,13 @@ pub fn simplify(
 
         // -- Commit
 
-        m.merge(e0, e1, |_a, _b| {
+        m.merge(e0, e1, |(_, _, a_s, a_r), (_, _, b_s, b_r)| {
             curr_costs[e1] = q01
                 .cost_attrib(pos, q01.attributes(pos, attr_ws), attr_ws)
                 .max(0.);
-            (q01, pos)
+
+            let (_, best_s, best_r) = best_rot(&q01.a, *a_s, *a_r, *b_s, *b_r);
+            (q01, pos, best_s, best_r)
         });
         debug_assert!(m.is_deleted(e0));
         debug_assert!(!m.is_deleted(e1));
@@ -248,9 +250,9 @@ pub fn simplify(
         }
     }
 
-    const BASES: [[F; 3]; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
+    //const BASES: [[F; 3]; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
 
-    for (vi, (_, &(q, p))) in m.vertices().enumerate() {
+    for (vi, (_, &(q, p, s, r))) in m.vertices().enumerate() {
         assert!(p.into_iter().all(F::is_finite));
         v[vi] = p;
         let attrs = q.attributes(p, attr_ws);
@@ -274,68 +276,8 @@ pub fn simplify(
         set_attrs(vi, attrs);
 
         // eigenvalues, eigenvectors (scale, basis)
-        let (es, vs) = q.a.eigen_sorted::<true>();
-        assert!(es.into_iter().all(F::is_finite));
-        let es = es.map(|e| e.clamp(-2., 2.));
-        use pars3d::quat;
-        assert!((pars3d::length(vs[0]) - 1.).abs() < 1e-5);
-        assert!((pars3d::length(vs[1]) - 1.).abs() < 1e-5);
-        //let r = quat::quat_from_standard(v0, v1);
-        let og_rot = rot[vi];
-        let bases0 = quat::quat_rot(BASES[0], og_rot);
-        let bases1 = quat::quat_rot(BASES[1], og_rot);
-
-        use pars3d::dot;
-        let mut nearest0 = 0;
-        let mut s0 = F::NEG_INFINITY;
-        let mut nearest1 = 0;
-        let mut s1 = F::NEG_INFINITY;
-        for (i, v) in vs.into_iter().enumerate() {
-            let d0 = dot(v, bases0).abs();
-            if d0 > s0 {
-                nearest0 = i;
-                s0 = d0;
-            }
-            let d1 = dot(v, bases1).abs();
-            if d1 > s1 {
-                nearest1 = i;
-                s1 = d1;
-            }
-        }
-        if nearest0 == nearest1 {
-            if s0 >= s1 {
-                // reassign nearest1
-                nearest1 = vs
-                    .iter()
-                    .enumerate()
-                    .filter(|&(i, _)| i != nearest0)
-                    .map(|(i, v)| (i, dot(*v, bases1)))
-                    .max_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))
-                    .unwrap()
-                    .0;
-            } else {
-                // reassign nearest0
-                nearest0 = vs
-                    .iter()
-                    .enumerate()
-                    .filter(|&(i, _)| i != nearest1)
-                    .map(|(i, v)| (i, dot(*v, bases0)))
-                    .max_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))
-                    .unwrap()
-                    .0;
-            }
-        }
-
-        assert_ne!(nearest0, nearest1, "{es:?} {vs:?}");
-        let other = match (nearest0, nearest1) {
-            (0, 1) | (1, 0) => 2,
-            (0, 2) | (2, 0) => 1,
-            (1, 2) | (2, 1) => 0,
-            _ => unreachable!(),
-        };
-
-        rot[vi] = quat::quat_from_standard(vs[nearest0], vs[nearest1]);
-        scale[vi] = [es[nearest0], es[nearest1], es[other]];
+        rot[vi] = r;
+        scale[vi] = s;
     }
 
     // denormalize all output vertices
@@ -348,4 +290,76 @@ pub fn simplify(
     }
 
     m.vertices.len()
+}
+
+fn covariance([sx, sy, sz]: [F; 3], q: [F; 4]) -> [[F; 3]; 3] {
+    let l = [[sx, 0., 0.], [0., sy, 0.], [0., 0., sz]];
+    let r = quat::quat_to_mat(q);
+    let rl = pars3d::matmul(r, l);
+    let cov = pars3d::matmul(rl, pars3d::transpose(rl));
+    assert_eq!(cov[0][1], cov[1][0]);
+    assert_eq!(cov[0][2], cov[2][0]);
+    assert_eq!(cov[1][2], cov[2][1]);
+    cov
+}
+
+pub fn frobenius(a: [[F; 3]; 3], b: [[F; 3]; 3]) -> F {
+    let mut sum = 0.;
+    for i in 0..3 {
+        for j in 0..3 {
+            //sum += a[i][j] * b[i][j];
+            sum += (a[i][j] - b[i][j]).abs()
+        }
+    }
+    return sum;
+}
+
+pub fn best_rot(
+    q: &super::sym::SymMatrix3,
+    a_s: [F; 3],
+    a_r: [F; 4],
+    b_s: [F; 3],
+    b_r: [F; 4],
+) -> (F, [F; 3], [F; 4]) {
+    let a_rm = covariance(a_s, a_r);
+    let b_rm = covariance(b_s, b_r);
+
+    let (es, vs) = q.eigen();
+
+    let mut best_v = F::INFINITY;
+    let mut best_r = [0.; 4];
+    let mut best_s = [0.; 3];
+
+    const IJKS: [[usize; 3]; 6] = [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
+    for axes in IJKS {
+        assert_ne!(axes[0], axes[1]);
+        assert_ne!(axes[1], axes[2]);
+        assert_ne!(axes[0], axes[2]);
+
+        for f in 0..8 {
+            let mat = std::array::from_fn(|i| {
+                let is_neg = ((f >> i) & 1) == 1;
+                vs[axes[i]].map(|v| if is_neg { -v } else { v })
+            });
+            let s = axes.map(|a| es[a]);
+            let rot = quat::quat_from_mat(mat);
+            let cov = covariance(s, rot);
+            let v = frobenius(cov, a_rm) + frobenius(cov, b_rm);
+
+            if v < best_v {
+                best_v = v;
+                best_s = s;
+                best_r = rot;
+            }
+        }
+    }
+
+    (best_v, best_s, best_r)
 }
