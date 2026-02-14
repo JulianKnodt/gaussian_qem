@@ -34,9 +34,9 @@ pub fn simplify(
 
     let get_attrs = |i: usize| {
         let mut data = [0.; GN];
-        data[0] = vc[i][0];
-        data[1] = vc[i][1];
-        data[2] = vc[i][2];
+        for c in 0..3 {
+            data[c] = vc[i][c];
+        }
         data[3] = op[i];
 
         let mut idx = 4;
@@ -256,9 +256,7 @@ pub fn simplify(
 
         let mut set_attrs = |i: usize, attrs: [F; GN]| {
             assert!(attrs.into_iter().all(F::is_finite));
-            vc[i][0] = attrs[0];
-            vc[i][1] = attrs[1];
-            vc[i][2] = attrs[2];
+            vc[i] = std::array::from_fn(|i| attrs[i]);
             op[i] = attrs[3];
 
             let mut idx = 4;
@@ -360,3 +358,13 @@ pub fn best_rot(
 
     (best_v, best_s, best_r)
 }
+
+/*
+pub fn sigmoid(x: F) -> F {
+    1. / (1. + (-x).exp())
+}
+
+pub fn inv_sigmoid(y: F) -> F {
+    y.ln() - (1. - y).ln()
+}
+*/
